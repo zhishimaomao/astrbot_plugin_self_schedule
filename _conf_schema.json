@@ -1,0 +1,52 @@
+{
+  "enable": {
+    "description": "启用自主主动消息",
+    "type": "bool",
+    "default": true
+  },
+  "idle_seconds": {
+    "description": "对话安静多少秒后开始做决定",
+    "type": "int",
+    "default": 90
+  },
+  "min_minutes": {
+    "description": "最短多久之后（分钟）",
+    "type": "int",
+    "default": 45
+  },
+  "max_minutes": {
+    "description": "最长多久之后（分钟）",
+    "type": "int",
+    "default": 360
+  },
+  "max_per_day": {
+    "description": "每天最多主动几次",
+    "type": "int",
+    "default": 3
+  },
+  "quiet_start": {
+    "description": "免打扰开始（小时，0-23）",
+    "type": "int",
+    "default": 0
+  },
+  "quiet_end": {
+    "description": "免打扰结束（小时，0-23）",
+    "type": "int",
+    "default": 8
+  },
+  "target_umos": {
+    "description": "允许的会话列表，留空表示所有私聊",
+    "type": "list",
+    "default": []
+  },
+  "provider_id": {
+    "description": "用于决策的模型 ID，留空则用当前会话模型",
+    "type": "string",
+    "default": ""
+  },
+  "decision_system_prompt": {
+    "description": "决策提示词",
+    "type": "text",
+    "default": "你负责决定：现在要不要主动去找对方说话，以及过多久再找他。只输出一个 JSON，不要解释。"
+  }
+}
