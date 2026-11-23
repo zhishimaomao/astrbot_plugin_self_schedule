@@ -1,0 +1,2 @@
+# astrbot_plugin_self_schedule
+让机器人自己决定何时主动找你
