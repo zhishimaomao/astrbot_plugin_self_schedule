@@ -6,7 +6,7 @@ version: 0.2.0
 author: zhishimaomao
 repo: https://github.com/zhishimaomao/astrbot_plugin_self_schedule
 license: MIT
-astrbot_version: ">=4.24.0,<5"
+astrbot_version: ">=4.24.0"
 support_platforms:
   - aiocqhttp
 tags:
