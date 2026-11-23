@@ -1,6 +1,6 @@
 # 自主找他（astrbot\_plugin\_self\_schedule）
 
-> \*\*本插件由 AI 制作。\*\*
+> \\\*\\\*本插件由 AI 制作。\\\*\\\*
 > 代码、配置与文档均由 AI 生成，经人工测试后发布。使用前请自行阅读代码并评估风险。
 
 让 AstrBot 的机器人**自己决定**要不要主动来找你、以及多久之后来找你。
@@ -42,12 +42,12 @@
 建议初始配置：
 
 ```
-idle\_seconds   90     聊天停下 1.5 分钟后再判断
-min\_minutes    45     最少 45 分钟后
-max\_minutes    360    最长 6 小时后
-max\_per\_day    3      一天最多三次
-quiet\_start    0      0\~8 点不打扰
-quiet\_end      8
+idle\\\_seconds   90     聊天停下 1.5 分钟后再判断
+min\\\_minutes    45     最少 45 分钟后
+max\\\_minutes    360    最长 6 小时后
+max\\\_per\\\_day    3      一天最多三次
+quiet\\\_start    0      0\\\~8 点不打扰
+quiet\\\_end      8
 ```
 
 ## 安装
@@ -64,7 +64,7 @@ quiet\_end      8
 
 ### 方式三：手动
 
-把整个目录放进 `AstrBot/data/plugins/astrbot\_plugin\_self\_schedule/`，重启。
+把整个目录放进 `AstrBot/data/plugins/astrbot\\\_plugin\\\_self\\\_schedule/`，重启。
 
 ## 配置项
 
@@ -73,14 +73,14 @@ quiet\_end      8
 |配置项|默认|说明|
 |-|-|-|
 |`enable`|true|总开关|
-|`idle\_seconds`|90|对话安静多少秒后开始判断|
-|`min\_minutes`|45|最短多久之后（分钟）|
-|`max\_minutes`|360|最长多久之后（分钟）|
-|`max\_per\_day`|3|每天最多主动几次|
-|`quiet\_start` / `quiet\_end`|0 / 8|免打扰时段（小时），这段时间内不会排|
-|`target\_umos`|\[]|只对这些会话生效，留空表示所有私聊|
-|`provider\_id`|""|用于决策的模型，留空用当前会话模型|
-|`decision\_system\_prompt`|见配置|决策提示词，可自己调教|
+|`idle\\\_seconds`|90|对话安静多少秒后开始判断|
+|`min\\\_minutes`|45|最短多久之后（分钟）|
+|`max\\\_minutes`|360|最长多久之后（分钟）|
+|`max\\\_per\\\_day`|3|每天最多主动几次|
+|`quiet\\\_start` / `quiet\\\_end`|0 / 8|免打扰时段（小时），这段时间内不会排|
+|`target\\\_umos`|\[]|只对这些会话生效，留空表示所有私聊|
+|`provider\\\_id`|""|用于决策的模型，留空用当前会话模型|
+|`decision\\\_system\\\_prompt`|见配置|决策提示词，可自己调教|
 
 ## 注意事项
 
