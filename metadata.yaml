@@ -1,6 +1,22 @@
 name: astrbot_plugin_self_schedule
 display_name: 自主找他
-desc: 让机器人在对话安静后自己决定"要不要找他、多久之后找他"（AI 制作）
+desc: 让机器人在对话安静后自己决定要不要找他、多久之后找他，到点主动发消息。
+short_desc: 让机器人自己决定何时主动找你
 version: 0.2.0
 author: zhishimaomao
 repo: https://github.com/zhishimaomao/astrbot_plugin_self_schedule
+license: MIT
+astrbot_version: ">=4.24.0,<5"
+support_platforms:
+  - aiocqhttp
+tags:
+  - 主动消息
+  - 拟人化
+  - 陪伴
+  - proactive
+keywords:
+  - 主动
+  - 拟人
+  - 陪伴
+  - proactive
+  - schedule
