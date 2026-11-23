@@ -1,6 +1,6 @@
 name: astrbot_plugin_self_schedule
 display_name: 自主找他
-desc: 让机器人在对话安静后自己决定"要不要找他、多久之后找他"
-version: 0.1.0
-author: 小鲸定制
-repo: https://example.local/self_schedule
+desc: 让机器人在对话安静后自己决定"要不要找他、多久之后找他"（AI 制作）
+version: 0.2.0
+author: zhishimaomao
+repo: https://github.com/zhishimaomao/astrbot_plugin_self_schedule
