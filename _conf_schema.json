@@ -45,7 +45,7 @@
     "default": 6
   },
   "target_umos": {
-    "description": "允许的会话列表，留空表示所有私聊",
+    "description": "只对这些会话生效；留空则自动发现最近的私聊",
     "type": "list",
     "default": []
   },
