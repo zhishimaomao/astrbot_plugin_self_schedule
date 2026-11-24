@@ -63,21 +63,39 @@ class SelfSchedulePlugin(Star):
         self._known_umos: set[str] = set(self.config.get("target_umos") or [])
 
         now = dt.datetime.now(TZ)
+        # 无论是否手动指定会话，都先用数据库里的真实最后消息时间；
+        # 查不到才退回"现在"，避免每次重启把沉默计时清零。
+        try:
+            self._seed_from_db(now)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[self_schedule] 读取会话时间失败: {e}")
         for umo in self._known_umos:
-            self._last_msg_at[umo] = now
-        # 列表为空时，从最近的会话记录里自动发现私聊，供心跳使用
-        if not self._known_umos:
-            try:
-                self._seed_from_db(now)
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"[self_schedule] 自动发现会话失败: {e}")
+            self._last_msg_at.setdefault(umo, now)
+        for umo, ts in self._last_msg_at.items():
+            logger.info(
+                "[self_schedule] 心跳关注 %s，最后消息时间 %s"
+                % (umo, ts.strftime("%m-%d %H:%M"))
+            )
 
+        self._ensure_heartbeat()
+
+    def _ensure_heartbeat(self) -> None:
+        if self._hb_task and not self._hb_task.done():
+            return
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 self._hb_task = loop.create_task(self._heartbeat_loop())
+                logger.info(
+                    "[self_schedule] 心跳已启动：每 %s 分钟检查，沉默 %s 小时后触发"
+                    % (
+                        self.config.get("heartbeat_check_minutes", 60),
+                        self.config.get("heartbeat_after_hours", 6),
+                    )
+                )
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[self_schedule] 心跳启动失败: {e}")
+
 
     # ---------- 事件 ----------
     @filter.event_message_type(filter.EventMessageType.ALL)
@@ -145,7 +163,7 @@ class SelfSchedulePlugin(Star):
 
     # ---------- 基础 ----------
     def _seed_from_db(self, now: dt.datetime) -> None:
-        """从 AstrBot 的会话表里找出最近的私聊，作为心跳的初始关注对象。"""
+        """从 AstrBot 的会话表里读取最近私聊，以及它们真实的最后消息时间。"""
         con = sqlite3.connect(f"file:{PERSONA_DB}?mode=ro", uri=True)
         try:
             rows = con.execute(
@@ -155,21 +173,22 @@ class SelfSchedulePlugin(Star):
             ).fetchall()
         finally:
             con.close()
+
+        targets = set(self.config.get("target_umos") or [])
         for umo, updated in rows:
-            if not umo or ":FriendMessage:" not in str(umo):
+            umo = str(umo or "")
+            if ":FriendMessage:" not in umo:
                 continue
-            self._known_umos.add(str(umo))
+            if targets and umo not in targets:
+                continue
+            self._known_umos.add(umo)
             ts = None
             try:
                 ts = dt.datetime.strptime(str(updated)[:19], "%Y-%m-%d %H:%M:%S")
                 ts = ts.replace(tzinfo=TZ)
             except Exception:
                 ts = None
-            self._last_msg_at[str(umo)] = ts or now
-        if self._known_umos:
-            logger.info(
-                f"[self_schedule] 自动发现 {len(self._known_umos)} 个私聊会话用于心跳"
-            )
+            self._last_msg_at[umo] = ts or now
 
     def _enabled(self) -> bool:
         return bool(self.config.get("enable", True))
