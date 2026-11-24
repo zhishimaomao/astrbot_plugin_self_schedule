@@ -89,14 +89,14 @@ heartbeat_after_hours     6     6 小时没聊天才允许心跳触发
 | `quiet_start` / `quiet_end` | 0 / 8 | 免打扰时段（小时） |
 | `heartbeat_check_minutes` | 60 | 心跳检查间隔（分钟），0 关闭 |
 | `heartbeat_after_hours` | 6 | 多久没聊天后允许心跳触发（小时），0 关闭 |
-| `target_umos` | [] | 只对这些会话生效；心跳需要它，留空则只处理收到过消息的会话 |
+| `target_umos` | [] | 只对这些会话生效；留空则自动发现最近的私聊 |
 | `provider_id` | "" | 用于决策的模型，留空用当前会话模型 |
 | `decision_system_prompt` | 见配置 | 决策提示词，可自己调教 |
 
 ## 注意事项
 
 - **重启会丢计划**：插件用 asyncio 计时，AstrBot 重启后未执行的计划会消失（对话或心跳后会重新判断）
-- **心跳需要 `target_umos`**：冷启动后没有任何消息时，插件靠它知道该关心哪个会话
+- **心跳的会话来源**：优先用 `target_umos`；留空时自动从会话记录里找最近的私聊
 - **每天有上限**：默认 3 次，避免过度打扰
 - **会花 token**：每次判断约 1,200 tokens，每次发送约 1,000 tokens，一天三次约 0.02 元（按 DeepSeek 价格估算）
 - **只支持能主动发消息的平台**：目前验证的是 aiocqhttp（QQ 个人号）

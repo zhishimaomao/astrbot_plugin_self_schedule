@@ -65,6 +65,12 @@ class SelfSchedulePlugin(Star):
         now = dt.datetime.now(TZ)
         for umo in self._known_umos:
             self._last_msg_at[umo] = now
+        # 列表为空时，从最近的会话记录里自动发现私聊，供心跳使用
+        if not self._known_umos:
+            try:
+                self._seed_from_db(now)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[self_schedule] 自动发现会话失败: {e}")
 
         try:
             loop = asyncio.get_event_loop()
@@ -138,6 +144,33 @@ class SelfSchedulePlugin(Star):
             return
 
     # ---------- 基础 ----------
+    def _seed_from_db(self, now: dt.datetime) -> None:
+        """从 AstrBot 的会话表里找出最近的私聊，作为心跳的初始关注对象。"""
+        con = sqlite3.connect(f"file:{PERSONA_DB}?mode=ro", uri=True)
+        try:
+            rows = con.execute(
+                "select user_id, updated_at from conversations "
+                "where user_id like '%FriendMessage%' "
+                "order by updated_at desc limit 10"
+            ).fetchall()
+        finally:
+            con.close()
+        for umo, updated in rows:
+            if not umo or ":FriendMessage:" not in str(umo):
+                continue
+            self._known_umos.add(str(umo))
+            ts = None
+            try:
+                ts = dt.datetime.strptime(str(updated)[:19], "%Y-%m-%d %H:%M:%S")
+                ts = ts.replace(tzinfo=TZ)
+            except Exception:
+                ts = None
+            self._last_msg_at[str(umo)] = ts or now
+        if self._known_umos:
+            logger.info(
+                f"[self_schedule] 自动发现 {len(self._known_umos)} 个私聊会话用于心跳"
+            )
+
     def _enabled(self) -> bool:
         return bool(self.config.get("enable", True))
 
