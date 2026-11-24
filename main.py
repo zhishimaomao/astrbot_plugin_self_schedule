@@ -1,8 +1,8 @@
-"""让她自己决定何时主动来找你（V0.2：插件自己计时、自己发，不依赖 cron）。
+"""让她自己决定何时主动来找你（V0.3：新增心跳，长时间没聊天也会想起你）。
 
 流程：
-对话安静 N 秒 → 模型决定「要不要找他、多久之后」→
-要的话，插件自己挂起计时 → 到点自己生成一句 → 直接发给对方。
+1. 对话安静 N 秒 → 模型决定「要不要找他、多久之后」→ 要的话插件自己计时，到点生成并发送。
+2. 心跳：每隔一段时间检查，若很久没聊天、没有待发计划、不在免打扰内，也会触发一次判断。
 """
 
 import asyncio
@@ -27,6 +27,7 @@ DEFAULT_SYSTEM = (
 
 DECISION_TEMPLATE = """当前时间：{now}
 今天你已经主动找过他 {used} 次，上限 {cap} 次。
+距离他最后一次说话：{idle_desc}
 你们最后几句对话：
 {recent}
 
@@ -47,16 +48,30 @@ SPEAK_TEMPLATE = """现在是 {now}。你之前决定在这个时候主动去找
 现在就用你平时的语气，主动发一条消息给他。一到两句就够，别像定时通知，也别解释你为什么来。"""
 
 
-@register("self_schedule", "小鲸定制", "让她自己决定何时主动找你", "0.2.0")
+@register("self_schedule", "zhishimaomao", "让她自己决定何时主动找你", "0.3.0")
 class SelfSchedulePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
         self.config = config or {}
         self._task: asyncio.Task | None = None
         self._send_task: asyncio.Task | None = None
+        self._hb_task: asyncio.Task | None = None
         self._last_umo: str | None = None
         self._buffer: dict[str, deque] = {}
         self._last_sent_at: dict[str, dt.datetime] = {}
+        self._last_msg_at: dict[str, dt.datetime] = {}
+        self._known_umos: set[str] = set(self.config.get("target_umos") or [])
+
+        now = dt.datetime.now(TZ)
+        for umo in self._known_umos:
+            self._last_msg_at[umo] = now
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                self._hb_task = loop.create_task(self._heartbeat_loop())
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[self_schedule] 心跳启动失败: {e}")
 
     # ---------- 事件 ----------
     @filter.event_message_type(filter.EventMessageType.ALL)
@@ -67,6 +82,8 @@ class SelfSchedulePlugin(Star):
         if not self._umo_allowed(umo):
             return
 
+        self._known_umos.add(umo)
+        self._last_msg_at[umo] = dt.datetime.now(TZ)
         self._buf(umo).append(("他", (event.message_str or "").strip()))
         self._last_umo = umo
         if self._task and not self._task.done():
@@ -82,6 +99,43 @@ class SelfSchedulePlugin(Star):
                 self._buffer[umo].append(("你", text))
         except Exception:
             pass
+
+    # ---------- 心跳 ----------
+    async def _heartbeat_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(
+                    max(5, int(self.config.get("heartbeat_check_minutes", 60))) * 60
+                )
+                await self._heartbeat_tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[self_schedule] 心跳异常: {e}")
+
+    async def _heartbeat_tick(self):
+        if not self._enabled():
+            return
+        hours = int(self.config.get("heartbeat_after_hours", 6))
+        if hours <= 0:
+            return
+        now = dt.datetime.now(TZ)
+        if self._in_quiet(now):
+            return
+        for umo in list(self._known_umos):
+            if not self._umo_allowed(umo):
+                continue
+            if self._send_task and not self._send_task.done():
+                continue
+            last = self._last_msg_at.get(umo)
+            if last is None:
+                self._last_msg_at[umo] = now
+                continue
+            if (now - last) < dt.timedelta(hours=hours):
+                continue
+            logger.info(f"[self_schedule] 心跳触发：已 {hours} 小时没聊天，让她判断一次")
+            await self._run_decision(umo)
+            return
 
     # ---------- 基础 ----------
     def _enabled(self) -> bool:
@@ -99,6 +153,14 @@ class SelfSchedulePlugin(Star):
     def _recent_text(self, umo: str, n: int = 8) -> str:
         items = list(self._buf(umo))[-n:]
         return "\n".join(f"{who}：{txt[:100]}" for who, txt in items) or "（还没有对话）"
+
+    def _in_quiet(self, when: dt.datetime) -> bool:
+        qs = int(self.config.get("quiet_start", 0))
+        qe = int(self.config.get("quiet_end", 8))
+        if qs == qe:
+            return False
+        h = when.hour
+        return (qs <= h < qe) if qs <= qe else (h >= qs or h < qe)
 
     # ---------- 决策 ----------
     async def _decide_later(self, umo: str):
@@ -129,10 +191,15 @@ class SelfSchedulePlugin(Star):
         now = dt.datetime.now(TZ)
         minm = int(self.config.get("min_minutes", 45))
         maxm = max(minm + 5, int(self.config.get("max_minutes", 360)))
+        last = self._last_msg_at.get(umo)
+        idle_desc = (
+            "%.1f 小时前" % ((now - last).total_seconds() / 3600) if last else "不确定"
+        )
         prompt = DECISION_TEMPLATE.format(
             now=now.strftime("%Y-%m-%d %H:%M (%A)"),
             used=used,
             cap=cap,
+            idle_desc=idle_desc,
             recent=self._recent_text(umo),
             minm=minm,
             maxm=maxm,
@@ -151,7 +218,9 @@ class SelfSchedulePlugin(Star):
         run_at = self._avoid_quiet(now + dt.timedelta(minutes=minutes))
         reason = self._parse_reason(text)
         wait = max(1, int((run_at - now).total_seconds()))
-        logger.info(f"[self_schedule] 计划 {run_at.strftime('%m-%d %H:%M')} 主动找他（{wait}s 后）")
+        logger.info(
+            f"[self_schedule] 计划 {run_at.strftime('%m-%d %H:%M')} 主动找他（{wait}s 后）"
+        )
         self._send_task = asyncio.create_task(self._later_send(umo, wait, reason))
 
     async def _later_send(self, umo: str, wait: int, reason: str):
@@ -171,8 +240,7 @@ class SelfSchedulePlugin(Star):
             recent=self._recent_text(umo),
         )
         system_prompt = self._persona_prompt() or "你是他的恋人，说话短、语气软。"
-        text = await self._llm(system_prompt, prompt)
-        text = (text or "").strip()
+        text = (await self._llm(system_prompt, prompt)).strip()
         if not text:
             logger.warning("[self_schedule] 生成为空，放弃发送")
             return
@@ -228,14 +296,9 @@ class SelfSchedulePlugin(Star):
         return m.group(1) if m else ""
 
     def _avoid_quiet(self, when: dt.datetime) -> dt.datetime:
-        qs = int(self.config.get("quiet_start", 0))
+        if not self._in_quiet(when):
+            return when
         qe = int(self.config.get("quiet_end", 8))
-        if qs == qe:
-            return when
-        h = when.hour
-        in_quiet = (qs <= h < qe) if qs <= qe else (h >= qs or h < qe)
-        if not in_quiet:
-            return when
         target = when.replace(hour=qe % 24, minute=10, second=0, microsecond=0)
         if target <= when:
             target += dt.timedelta(days=1)
@@ -243,8 +306,8 @@ class SelfSchedulePlugin(Star):
 
     def _count_today(self, umo: str) -> int:
         today = dt.datetime.now(TZ).date()
-        n = 0
-        for key, when in self._last_sent_at.items():
-            if key == umo and when.date() == today:
-                n += 1
-        return n
+        return sum(
+            1
+            for key, when in self._last_sent_at.items()
+            if key == umo and when.date() == today
+        )

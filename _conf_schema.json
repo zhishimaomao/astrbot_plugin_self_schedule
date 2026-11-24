@@ -34,6 +34,16 @@
     "type": "int",
     "default": 8
   },
+  "heartbeat_check_minutes": {
+    "description": "心跳检查间隔（分钟），填 0 关闭心跳",
+    "type": "int",
+    "default": 60
+  },
+  "heartbeat_after_hours": {
+    "description": "多久没聊天后允许心跳触发判断（小时），填 0 关闭",
+    "type": "int",
+    "default": 6
+  },
   "target_umos": {
     "description": "允许的会话列表，留空表示所有私聊",
     "type": "list",
