@@ -55,7 +55,7 @@ SPEAK_TEMPLATE = """现在是 {now}。你之前决定在这个时候主动去找
 现在就用你平时的语气，主动发一条消息给他。一到两句就够，别像定时通知，也别解释你为什么来。"""
 
 
-@register("self_schedule", "zhishimaomao", "让她自己决定何时主动找你", "0.3.0")
+@register("self_schedule", "zhishimaomao", "让她自己决定何时主动找你", "0.4.1")
 class SelfSchedulePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
